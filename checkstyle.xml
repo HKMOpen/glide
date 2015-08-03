@@ -14,6 +14,9 @@
         <property name="message" value="Line has trailing spaces."/>
     </module>
 
+    <!-- Ensure trailling newline for compatibility -->
+    <module name="NewlineAtEndOfFile" />
+
     <!-- Space after 'for' and 'if' -->
     <module name="RegexpSingleline">
         <property name="format" value="^\s*(for|if)\b[^ ]"/>
@@ -91,6 +94,7 @@
         <module name="ImportOrder">
           <!-- Checks for out of order import statements. -->
 
+          <property name="sortStaticImportsAlphabetically" value="true"/>
            <property name="severity" value="error"/>
            <property name="groups" value="com.google,*,java,javax"/>
            <!-- This ensures that static imports go first. -->
@@ -141,16 +145,13 @@
         <module name="NoClone" />
         <module name="NoFinalizer" />
         <module name="OneStatementPerLine" />
-        <module name="RedundantThrows" >
-            <property name="suppressLoadErrors" value="true" />
-        </module>
         <module name="IllegalInstantiation"/>
         <module name="SimplifyBooleanExpression" />
         <module name="SimplifyBooleanReturn" />
         <module name="StringLiteralEquality" />
         <module name="UnnecessaryParentheses" />
         <module name="LineLength">
-            <property name="max" value="120" />
+            <property name="max" value="100" />
         </module>
 
         <!-- Checks for class design. -->

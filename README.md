@@ -27,7 +27,7 @@ repositories {
 }
 
 dependencies {
-    compile 'com.github.bumptech.glide:glide:3.5.1'
+    compile 'com.github.bumptech.glide:glide:3.6.0'
     compile 'com.android.support:support-v4:19.1.0'
 }
 ```
@@ -38,7 +38,7 @@ Or Maven:
 <dependency>
   <groupId>com.github.bumptech.glide</groupId>
   <artifactId>glide</artifactId>
-  <version>3.5.1</version>
+  <version>3.6.0</version>
   <type>aar</type>
 </dependency>
 <dependency>
@@ -46,6 +46,17 @@ Or Maven:
   <artifactId>support-v4</artifactId>
   <version>r7</version>
 </dependency>
+```
+
+Proguard
+--------
+Depending on your proguard config and usage, you may need to include the following lines in your proguard.cfg:
+```
+-keep public class * implements com.bumptech.glide.module.GlideModule
+-keep public enum com.bumptech.glide.load.resource.bitmap.ImageHeaderParser$** {
+    **[] $VALUES;
+    public *;
+}
 ```
 
 How do I use Glide?
@@ -63,7 +74,7 @@ public void onCreate(Bundle savedInstanceState) {
 
     ImageView imageView = (ImageView) findViewById(R.id.my_image_view);
 
-    Glide.with(this).load("http://goo.gl/h8qOq7").into(imageView);
+    Glide.with(this).load("http://goo.gl/gEgYUd").into(imageView);
 }
 
 // For a list:

@@ -1,5 +1,5 @@
 apply plugin: 'com.android.library'
-apply plugin: 'robolectric'
+apply plugin: 'org.robolectric'
 apply plugin: 'maven'
 apply plugin: 'findbugs'
 apply plugin: 'pmd'
@@ -7,10 +7,10 @@ apply plugin: 'jacoco'
 apply plugin: 'com.github.kt3k.coveralls'
 
 findbugs {
-    toolVersion = "2.0.3"
+    toolVersion = FINDBUGS_VERSION
 }
 jacoco {
-    toolVersion = "0.7.1.201405082137"
+    toolVersion = JACOCO_VERSION
 }
 coveralls {
     jacocoReportPath = 'build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml'
@@ -18,37 +18,45 @@ coveralls {
 
 dependencies {
     compile project(':third_party:gif_decoder')
-    compile project(':third_party:gif_encoder')
     compile project(':third_party:disklrucache')
     compile "com.android.support:support-v4:${SUPPORT_V4_VERSION}"
 
-    androidTestCompile project(':testutil')
-    androidTestCompile 'com.google.guava:guava-testlib:18.0'
-    androidTestCompile "com.android.support:support-v4:${SUPPORT_V4_VERSION}"
-    androidTestCompile "com.google.truth:truth:${TRUTH_VERSION}"
-    androidTestCompile "junit:junit:${JUNIT_VERSION}"
-    androidTestCompile "org.mockito:mockito-all:${MOCKITO_VERSION}"
-    androidTestCompile "org.robolectric:robolectric:${ROBOLECTRIC_VERSION}"
-    // TODO: increase this to 2.0.+ when we compile against Java 7.
-    androidTestCompile "com.squareup.okhttp:mockwebserver:${MOCKWEBSERVER_VERSION}"
+    testCompile project(':testutil')
+    testCompile 'com.google.guava:guava-testlib:18.0'
+    testCompile "com.google.truth:truth:${TRUTH_VERSION}"
+    testCompile "junit:junit:${JUNIT_VERSION}"
+    testCompile "org.mockito:mockito-all:${MOCKITO_VERSION}"
+    testCompile "org.robolectric:robolectric:${ROBOLECTRIC_VERSION}"
+    testCompile "com.squareup.okhttp:mockwebserver:${MOCKWEBSERVER_VERSION}"
+    testCompile "com.android.support:support-v4:${SUPPORT_V4_VERSION}"
+}
+
+android.testOptions.unitTests.all {
+    // configure max heap size of the test JVM
+    maxHeapSize = '2048m'
 }
 
 android {
     compileSdkVersion COMPILE_SDK_VERSION as int
-    buildToolsVersion BUILD_TOOLS_VERSION
+    buildToolsVersion BUILD_TOOLS_VERSION as String
 
     defaultConfig {
         minSdkVersion MIN_SDK_VERSION as int
         targetSdkVersion TARGET_SDK_VERSION as int
 
-        versionCode = VERSION_CODE as int
-        versionName = VERSION_NAME
+        versionCode VERSION_CODE as int
+        versionName VERSION_NAME as String
     }
 
     buildTypes {
         debug {
             testCoverageEnabled = true
         }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_7
+        targetCompatibility JavaVersion.VERSION_1_7
     }
 }
 
@@ -60,7 +68,7 @@ afterEvaluate {
 
         classes = fileTree('build/intermediates/classes/debug/')
         source = fileTree('src/main/java')
-        classpath = files(project.configurations.compile.asPath)
+        classpath = project.configurations.compile
 
         effort = 'max'
 
@@ -72,13 +80,10 @@ afterEvaluate {
         }
     }
 
-    findbugsTestDebug {
-        enabled = false
-    }
-
     check.dependsOn('findbugs')
 
     task pmd(type: Pmd) {
+        targetJdk = TargetJdk.VERSION_1_7
 
         description 'Run pmd'
         group 'verification'
@@ -95,13 +100,9 @@ afterEvaluate {
         }
     }
 
-    pmdTestDebug {
-        enabled = false
-    }
-
     check.dependsOn('pmd')
 
-    task jacocoTestReport(type:JacocoReport, dependsOn: testDebug) {
+    task jacocoTestReport(type: JacocoReport, dependsOn: testDebug) {
         def coverageSourceDirs = ['src/main/java']
         group = "Reporting"
         description = "Generate Jacoco coverage reports"
@@ -114,7 +115,7 @@ afterEvaluate {
                            '**/Manifest*.*',
                            '**/BitmapRequestBuilder.class',
                            '**/DrawableRequestBuilder.class',
-                           '**/GifRequestBuilder.class', ]
+                           '**/GifRequestBuilder.class',]
         )
 
         additionalSourceDirs = files(coverageSourceDirs)
