@@ -13,7 +13,10 @@ import java.io.InputStream;
 
 /**
  * A simple model loader for fetching media over http/https using OkHttp.
+ *
+ * @deprecated replaced with com.bumptech.glide.integration.okhttp3.OkHttpUrlLoader.
  */
+@Deprecated
 public class OkHttpUrlLoader implements ModelLoader<GlideUrl, InputStream> {
 
   private final OkHttpClient client;

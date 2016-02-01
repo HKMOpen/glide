@@ -200,7 +200,14 @@ public final class SingleRequest<R> implements Request,
     stateVerifier.throwIfRecycled();
     startTime = LogTime.getLogTime();
     if (model == null) {
-      onLoadFailed(new GlideException("Received null model"));
+      if (Util.isValidDimensions(overrideWidth, overrideHeight)) {
+        width = overrideWidth;
+        height = overrideHeight;
+      }
+      // Only log at more verbose log levels if the user has set a fallback drawable, because
+      // fallback Drawables indicate the user expects null models occasionally.
+      int logLevel = getFallbackDrawable() == null ? Log.WARN : Log.DEBUG;
+      onLoadFailed(new GlideException("Received null model"), logLevel);
       return;
     }
 
@@ -482,9 +489,13 @@ public final class SingleRequest<R> implements Request,
    */
   @Override
   public void onLoadFailed(GlideException e) {
+    onLoadFailed(e, Log.WARN);
+  }
+
+  private void onLoadFailed(GlideException e, int maxLogLevel) {
     stateVerifier.throwIfRecycled();
     int logLevel = glideContext.getLogLevel();
-    if (logLevel <= Log.WARN) {
+    if (logLevel <= maxLogLevel) {
       Log.w(GLIDE_TAG, "Load failed for " + model + " with size [" + width + "x" + height + "]", e);
       if (logLevel <= Log.INFO) {
         e.logRootCauses(GLIDE_TAG);

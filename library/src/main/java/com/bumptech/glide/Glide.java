@@ -20,8 +20,10 @@ import com.bumptech.glide.gifdecoder.GifDecoder;
 import com.bumptech.glide.load.DecodeFormat;
 import com.bumptech.glide.load.data.InputStreamRewinder;
 import com.bumptech.glide.load.engine.Engine;
+import com.bumptech.glide.load.engine.bitmap_recycle.ArrayPool;
 import com.bumptech.glide.load.engine.bitmap_recycle.BitmapPool;
 import com.bumptech.glide.load.engine.bitmap_recycle.ByteArrayPool;
+import com.bumptech.glide.load.engine.bitmap_recycle.LruByteArrayPool;
 import com.bumptech.glide.load.engine.cache.MemoryCache;
 import com.bumptech.glide.load.engine.prefill.BitmapPreFiller;
 import com.bumptech.glide.load.engine.prefill.PreFillType;
@@ -29,6 +31,7 @@ import com.bumptech.glide.load.model.AssetUriLoader;
 import com.bumptech.glide.load.model.ByteArrayLoader;
 import com.bumptech.glide.load.model.ByteBufferEncoder;
 import com.bumptech.glide.load.model.ByteBufferFileLoader;
+import com.bumptech.glide.load.model.DataUrlLoader;
 import com.bumptech.glide.load.model.FileLoader;
 import com.bumptech.glide.load.model.GlideUrl;
 import com.bumptech.glide.load.model.MediaStoreFileLoader;
@@ -60,6 +63,7 @@ import com.bumptech.glide.load.resource.gif.StreamGifDecoder;
 import com.bumptech.glide.load.resource.transcode.BitmapBytesTranscoder;
 import com.bumptech.glide.load.resource.transcode.BitmapDrawableTranscoder;
 import com.bumptech.glide.load.resource.transcode.GifDrawableBytesTranscoder;
+import com.bumptech.glide.manager.ConnectivityMonitorFactory;
 import com.bumptech.glide.manager.RequestManagerRetriever;
 import com.bumptech.glide.module.GlideModule;
 import com.bumptech.glide.module.ManifestParser;
@@ -92,7 +96,9 @@ public class Glide implements ComponentCallbacks2 {
   private final BitmapPreFiller bitmapPreFiller;
   private final GlideContext glideContext;
   private final Registry registry;
+  private final ArrayPool arrayPool;
   private final ByteArrayPool byteArrayPool;
+  private final ConnectivityMonitorFactory connectivityMonitorFactory;
   private final List<RequestManager> managers = new ArrayList<>();
 
   /**
@@ -165,12 +171,21 @@ public class Glide implements ComponentCallbacks2 {
   }
 
   @TargetApi(Build.VERSION_CODES.ICE_CREAM_SANDWICH)
-  Glide(Engine engine, MemoryCache memoryCache, BitmapPool bitmapPool, ByteArrayPool byteArrayPool,
-      Context context, int logLevel, RequestOptions defaultRequestOptions) {
+  Glide(
+      Context context,
+      Engine engine,
+      MemoryCache memoryCache,
+      BitmapPool bitmapPool,
+      ArrayPool arrayPool,
+      ConnectivityMonitorFactory connectivityMonitorFactory,
+      int logLevel,
+      RequestOptions defaultRequestOptions) {
     this.engine = engine;
     this.bitmapPool = bitmapPool;
-    this.byteArrayPool = byteArrayPool;
+    this.arrayPool = arrayPool;
     this.memoryCache = memoryCache;
+    this.connectivityMonitorFactory = connectivityMonitorFactory;
+    this.byteArrayPool = new LruByteArrayPool();
 
     DecodeFormat decodeFormat = defaultRequestOptions.getOptions().get(Downsampler.DECODE_FORMAT);
     bitmapPreFiller = new BitmapPreFiller(memoryCache, bitmapPool, decodeFormat);
@@ -179,8 +194,8 @@ public class Glide implements ComponentCallbacks2 {
 
     Downsampler downsampler =
         new Downsampler(resources.getDisplayMetrics(), bitmapPool, byteArrayPool);
-    ByteBufferGifDecoder byteBufferGifDecoder = new ByteBufferGifDecoder(context, bitmapPool,
-        byteArrayPool);
+    ByteBufferGifDecoder byteBufferGifDecoder =
+        new ByteBufferGifDecoder(context, bitmapPool, arrayPool);
     registry = new Registry(context)
         .register(ByteBuffer.class, new ByteBufferEncoder())
         .register(InputStream.class, new StreamEncoder(byteArrayPool))
@@ -223,6 +238,7 @@ public class Glide implements ComponentCallbacks2 {
         .append(Integer.class, InputStream.class, new ResourceLoader.StreamFactory())
         .append(Integer.class, ParcelFileDescriptor.class,
             new ResourceLoader.FileDescriptorFactory())
+        .append(String.class, InputStream.class, new DataUrlLoader.StreamFactory())
         .append(String.class, InputStream.class, new StringLoader.StreamFactory())
         .append(String.class, ParcelFileDescriptor.class, new StringLoader.FileDescriptorFactory())
         .append(Uri.class, InputStream.class, new HttpUriLoader.Factory())
@@ -276,6 +292,14 @@ public class Glide implements ComponentCallbacks2 {
     return byteArrayPool;
   }
 
+  public ArrayPool getArrayPool() {
+    return arrayPool;
+  }
+
+  ConnectivityMonitorFactory getConnectivityMonitorFactory() {
+    return connectivityMonitorFactory;
+  }
+
   GlideContext getGlideContext() {
     return glideContext;
   }
@@ -316,9 +340,12 @@ public class Glide implements ComponentCallbacks2 {
    * @see android.content.ComponentCallbacks2#onLowMemory()
    */
   public void clearMemory() {
-    bitmapPool.clearMemory();
+    // Engine asserts this anyway when removing resources, fail faster and consistently
+    Util.assertMainThread();
+    // memory cache needs to be cleared before bitmap pool to clear re-pooled Bitmaps too. See #687.
     memoryCache.clearMemory();
-    byteArrayPool.clearMemory();
+    bitmapPool.clearMemory();
+    arrayPool.clearMemory();
   }
 
   /**
@@ -327,9 +354,12 @@ public class Glide implements ComponentCallbacks2 {
    * @see android.content.ComponentCallbacks2#onTrimMemory(int)
    */
   public void trimMemory(int level) {
-    bitmapPool.trimMemory(level);
+    // Engine asserts this anyway when removing resources, fail faster and consistently
+    Util.assertMainThread();
+    // memory cache needs to be trimmed before bitmap pool to trim re-pooled Bitmaps too. See #687.
     memoryCache.trimMemory(level);
-    byteArrayPool.trimMemory(level);
+    bitmapPool.trimMemory(level);
+    arrayPool.trimMemory(level);
   }
 
   /**
@@ -355,6 +385,9 @@ public class Glide implements ComponentCallbacks2 {
    * to change the default. </p>
    */
   public void setMemoryCategory(MemoryCategory memoryCategory) {
+    // Engine asserts this anyway when removing resources, fail faster and consistently
+    Util.assertMainThread();
+    // memory cache needs to be trimmed before bitmap pool to trim re-pooled Bitmaps too. See #687.
     memoryCache.setSizeMultiplier(memoryCategory.getMultiplier());
     bitmapPool.setSizeMultiplier(memoryCategory.getMultiplier());
   }

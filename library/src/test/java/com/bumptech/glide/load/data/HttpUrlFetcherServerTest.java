@@ -10,9 +10,9 @@ import com.bumptech.glide.Priority;
 import com.bumptech.glide.load.model.GlideUrl;
 import com.bumptech.glide.load.model.Headers;
 import com.bumptech.glide.testutil.TestUtil;
-import com.squareup.okhttp.mockwebserver.MockResponse;
-import com.squareup.okhttp.mockwebserver.MockWebServer;
-import com.squareup.okhttp.mockwebserver.RecordedRequest;
+import okhttp3.mockwebserver.MockResponse;
+import okhttp3.mockwebserver.MockWebServer;
+import okhttp3.mockwebserver.RecordedRequest;
 
 import org.junit.After;
 import org.junit.Before;
@@ -55,7 +55,7 @@ public class HttpUrlFetcherServerTest {
     defaultFollowRedirects = HttpURLConnection.getFollowRedirects();
     HttpURLConnection.setFollowRedirects(false);
     mockWebServer = new MockWebServer();
-    mockWebServer.play();
+    mockWebServer.start();
 
     streamCaptor = ArgumentCaptor.forClass(InputStream.class);
   }
@@ -80,7 +80,7 @@ public class HttpUrlFetcherServerTest {
   public void testHandlesRedirect301s() throws Exception {
     String expected = "fakedata";
     mockWebServer.enqueue(new MockResponse().setResponseCode(301)
-        .setHeader("Location", mockWebServer.getUrl("/redirect")));
+        .setHeader("Location", mockWebServer.url("/redirect").toString()));
     mockWebServer.enqueue(new MockResponse().setResponseCode(200).setBody(expected));
     getFetcher().loadData(Priority.LOW, callback);
     verify(callback).onDataReady(streamCaptor.capture());
@@ -91,7 +91,7 @@ public class HttpUrlFetcherServerTest {
   public void testHandlesRedirect302s() throws Exception {
     String expected = "fakedata";
     mockWebServer.enqueue(new MockResponse().setResponseCode(302)
-        .setHeader("Location", mockWebServer.getUrl("/redirect")));
+        .setHeader("Location", mockWebServer.url("/redirect").toString()));
     mockWebServer.enqueue(new MockResponse().setResponseCode(200).setBody(expected));
     getFetcher().loadData(Priority.LOW, callback);
     verify(callback).onDataReady(streamCaptor.capture());
@@ -120,7 +120,7 @@ public class HttpUrlFetcherServerTest {
     String redirectBase = "/redirect";
     for (int i = 0; i < numRedirects; i++) {
       mockWebServer.enqueue(new MockResponse().setResponseCode(301)
-          .setHeader("Location", mockWebServer.getUrl(redirectBase + i)));
+          .setHeader("Location", mockWebServer.url(redirectBase + i).toString()));
     }
     mockWebServer.enqueue(new MockResponse().setResponseCode(200).setBody(expected));
 
@@ -137,9 +137,9 @@ public class HttpUrlFetcherServerTest {
   @Test
   public void testFailsOnRedirectLoops() throws Exception {
     mockWebServer.enqueue(new MockResponse().setResponseCode(301)
-        .setHeader("Location", mockWebServer.getUrl("/redirect")));
+        .setHeader("Location", mockWebServer.url("/redirect").toString()));
     mockWebServer.enqueue(new MockResponse().setResponseCode(301)
-        .setHeader("Location", mockWebServer.getUrl("/redirect")));
+        .setHeader("Location", mockWebServer.url("/redirect").toString()));
 
     getFetcher().loadData(Priority.IMMEDIATE, callback);
 
@@ -176,7 +176,7 @@ public class HttpUrlFetcherServerTest {
   public void testFailsAfterTooManyRedirects() throws Exception {
     for (int i = 0; i < 10; i++) {
       mockWebServer.enqueue(new MockResponse().setResponseCode(301)
-          .setHeader("Location", mockWebServer.getUrl("/redirect" + i)));
+          .setHeader("Location", mockWebServer.url("/redirect" + i).toString()));
     }
     getFetcher().loadData(Priority.NORMAL, callback);
 
@@ -204,7 +204,7 @@ public class HttpUrlFetcherServerTest {
     MockWebServer tempWebServer = new MockWebServer();
     tempWebServer.enqueue(
         new MockResponse().setBody("test").throttleBody(1, TIMEOUT_TIME_MS, TimeUnit.MILLISECONDS));
-    tempWebServer.play();
+    tempWebServer.start();
 
     try {
       getFetcher().loadData(Priority.HIGH, callback);
@@ -233,11 +233,11 @@ public class HttpUrlFetcherServerTest {
   }
 
   private HttpUrlFetcher getFetcher() {
-    return getFetcher(Headers.NONE);
+    return getFetcher(Headers.DEFAULT);
   }
 
   private HttpUrlFetcher getFetcher(Headers headers) {
-    URL url = mockWebServer.getUrl(DEFAULT_PATH);
+    URL url = mockWebServer.url(DEFAULT_PATH).url();
     return new HttpUrlFetcher(new GlideUrl(url, headers), TIMEOUT_TIME_MS,
         HttpUrlFetcher.DEFAULT_CONNECTION_FACTORY);
   }

@@ -6,8 +6,12 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.testing.EqualsTester;
 
+import android.support.annotation.Nullable;
+
 import com.bumptech.glide.load.model.LazyHeaders.Builder;
 
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
@@ -18,6 +22,22 @@ import java.util.Map;
 @RunWith(RobolectricTestRunner.class)
 @Config(manifest = Config.NONE, sdk = 18)
 public class LazyHeadersTest {
+  private static final String DEFAULT_USER_AGENT = "default_user_agent";
+  private static final String DEFAULT_USER_AGENT_PROPERTY = "http.agent";
+  private String initialUserAgent;
+
+  @Before
+  public void setUp() {
+    initialUserAgent = System.getProperty(DEFAULT_USER_AGENT_PROPERTY);
+    System.setProperty(DEFAULT_USER_AGENT_PROPERTY, DEFAULT_USER_AGENT);
+  }
+
+  @After
+  public void tearDown() {
+    if (initialUserAgent != null) {
+      System.setProperty(DEFAULT_USER_AGENT_PROPERTY, initialUserAgent);
+    }
+  }
 
   @Test
   public void testIncludesEagerHeaders() {
@@ -209,6 +229,55 @@ public class LazyHeadersTest {
     builder.addHeader("User-Agent", "true");
     headers = builder.build();
     assertThat(headers.getHeaders()).containsEntry("User-Agent", "false,true");
+  }
+
+  @Test
+  public void testKeyNotIncludedWithFactoryThatReturnsNullValue() {
+    Builder builder = new Builder();
+    builder.setHeader("test", new LazyHeaderFactory() {
+      @Nullable
+      @Override
+      public String buildHeader() {
+        return null;
+      }
+    });
+    LazyHeaders headers = builder.build();
+    assertThat(headers.getHeaders()).doesNotContainKey("test");
+  }
+
+  @Test
+  public void testKeyNotIncludedWithFactoryThatReturnsEmptyValue() {
+    Builder builder = new Builder();
+    builder.setHeader("test", new LazyHeaderFactory() {
+      @Nullable
+      @Override
+      public String buildHeader() {
+        return "";
+      }
+    });
+    LazyHeaders headers = builder.build();
+    assertThat(headers.getHeaders()).doesNotContainKey("test");
+  }
+
+  @Test
+  public void testKeyIncludedWithOneFactoryThatReturnsNullAndOneFactoryThatDoesNotReturnNull() {
+    Builder builder = new Builder();
+    builder.addHeader("test", new LazyHeaderFactory() {
+      @Nullable
+      @Override
+      public String buildHeader() {
+        return null;
+      }
+    });
+    builder.addHeader("test", new LazyHeaderFactory() {
+      @Nullable
+      @Override
+      public String buildHeader() {
+        return "value";
+      }
+    });
+    LazyHeaders headers = builder.build();
+    assertThat(headers.getHeaders()).containsEntry("test", "value");
   }
 
   @Test

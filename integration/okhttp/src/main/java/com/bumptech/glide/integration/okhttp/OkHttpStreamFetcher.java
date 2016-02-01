@@ -18,7 +18,10 @@ import java.util.Map;
 
 /**
  * Fetches an {@link InputStream} using the okhttp library.
+ *
+ * @deprecated replaced with com.bumptech.glide.integration.okhttp3.OkHttpStreamFetcher.
  */
+@Deprecated
 public class OkHttpStreamFetcher implements DataFetcher<InputStream> {
   private static final String TAG = "OkHttpFetcher";
   private final OkHttpClient client;

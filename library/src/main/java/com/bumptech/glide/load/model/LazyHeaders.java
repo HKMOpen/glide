@@ -47,12 +47,18 @@ public final class LazyHeaders implements Headers {
       int size = factories.size();
       for (int i = 0; i < size; i++) {
         LazyHeaderFactory factory = factories.get(i);
-        sb.append(factory.buildHeader());
-        if (i != factories.size() - 1) {
-          sb.append(',');
+        String header = factory.buildHeader();
+        if (!TextUtils.isEmpty(header)) {
+          sb.append(header);
+          if (i != factories.size() - 1) {
+            sb.append(',');
+          }
         }
       }
-      combinedHeaders.put(entry.getKey(), sb.toString());
+      String values = sb.toString();
+      if (!TextUtils.isEmpty(values)) {
+        combinedHeaders.put(entry.getKey(), sb.toString());
+      }
     }
 
     return combinedHeaders;
@@ -117,9 +123,9 @@ public final class LazyHeaders implements Headers {
     }
 
     private boolean copyOnModify = true;
-    private boolean isEncodingDefault = true;
     private Map<String, List<LazyHeaderFactory>> headers = DEFAULT_HEADERS;
-    private boolean isUserAgentDefault = headers.containsKey(DEFAULT_USER_AGENT);
+    private boolean isEncodingDefault = true;
+    private boolean isUserAgentDefault = true;
 
     /**
      * Adds a value for the given header and returns this builder.
